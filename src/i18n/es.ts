@@ -14,9 +14,8 @@ export default {
   teams: 'Equipos',
   fees: 'Cuotas',
   staff: 'Personal',
-  playerSalaries: 'Salarios',
+  playerSalaries: 'Nóminas',
   invoices: 'Facturas',
-  settings: 'Configuración',
   logout: 'Cerrar sesión',
 
   // Teams
@@ -55,14 +54,19 @@ export default {
   confirmDeletePayment: '¿Estás seguro de que quieres eliminar este pago? Esta acción no se puede deshacer.',
   errorDeletingPayment: 'Error al eliminar el pago. Por favor, inténtalo de nuevo.',
 
-  // Settings
-  otherSettings: 'Otras Configuraciones',
-  theme: 'Tema',
-  themeSystem: 'Sistema',
-  themeLight: 'Claro',
-  themeDark: 'Oscuro',
-  language: 'Idioma',
-  langEs: 'Español',
-  langVal: 'Valenciano',
-  langEn: 'English'
+  // Salaries
+  salaryStats: 'Estadísticas de Nóminas',
+  totalMembers: 'Total Empleados',
+  completedPayments: 'Pagos Completados',
+  pendingPayments: 'Pagos Pendientes',
+  averageSalary: 'Salario Promedio',
+  paidMembers: '{{count}} empleados pagados',
+  pendingMembers: '{{count}} empleados pendientes',
+  monthly: 'Mensual',
+  yearly: 'Anual',
+  teamStats: 'Estadísticas por Equipo',
+  team: 'Equipo',
+  members: 'Miembros',
+  paid: 'Pagado',
+  completion: 'Completado'
 } as const;

@@ -1,13 +1,15 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Trophy, FileText, CreditCard, Users, DollarSign, LogOut, Settings as SettingsIcon } from 'lucide-react';
+import { Trophy, FileText, CreditCard, Users, DollarSign, LogOut, Menu } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import { useTranslation } from '../hooks/useTranslation';
 import NotificationBell from './NotificationBell';
+import { useState } from 'react';
 
 export default function Sidebar() {
   const { signOut } = useAuth();
   const location = useLocation();
   const { t } = useTranslation();
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   const menuItems = [
     { path: '/', icon: Trophy, label: t('teams') },
@@ -15,18 +17,27 @@ export default function Sidebar() {
     { path: '/staff', icon: Users, label: t('staff') },
     { path: '/player-salaries', icon: DollarSign, label: t('playerSalaries') },
     { path: '/invoices', icon: FileText, label: t('invoices') },
-    { path: '/settings', icon: SettingsIcon, label: t('settings') },
   ];
 
   return (
-    <div className="bg-gray-900 text-white w-64 min-h-screen flex flex-col">
+    <div className={`bg-gray-900 text-white ${isCollapsed ? 'w-16' : 'w-64'} min-h-screen flex flex-col transition-all duration-300`}>
       <div className="p-4">
         <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center space-x-2">
+          {!isCollapsed ? (
+            <div className="flex items-center space-x-2">
+              <Trophy className="h-8 w-8" />
+              <span className="text-xl font-bold">Club Deportivo</span>
+            </div>
+          ) : (
             <Trophy className="h-8 w-8" />
-            <span className="text-xl font-bold">Club Deportivo</span>
-          </div>
-          <NotificationBell />
+          )}
+          <button
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className="p-2 rounded-lg hover:bg-gray-800 transition-colors"
+            title={isCollapsed ? "Expandir menú" : "Contraer menú"}
+          >
+            <Menu className="h-5 w-5" />
+          </button>
         </div>
         
         <nav className="space-y-2">
@@ -34,14 +45,15 @@ export default function Sidebar() {
             <Link
               key={item.path}
               to={item.path}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
+              className={`flex items-center ${!isCollapsed ? 'space-x-2' : 'justify-center'} px-4 py-2 rounded-lg transition-colors ${
                 location.pathname === item.path
                   ? 'bg-blue-600 text-white'
                   : 'text-gray-300 hover:bg-gray-800'
               }`}
+              title={isCollapsed ? item.label : undefined}
             >
               <item.icon className="h-5 w-5" />
-              <span>{item.label}</span>
+              {!isCollapsed && <span>{item.label}</span>}
             </Link>
           ))}
         </nav>
@@ -50,10 +62,11 @@ export default function Sidebar() {
       <div className="mt-auto p-4">
         <button
           onClick={() => signOut()}
-          className="flex items-center space-x-2 px-4 py-2 w-full text-gray-300 hover:bg-gray-800 rounded-lg transition-colors"
+          className={`flex items-center ${!isCollapsed ? 'space-x-2' : 'justify-center'} px-4 py-2 w-full text-gray-300 hover:bg-gray-800 rounded-lg transition-colors`}
+          title={isCollapsed ? t('logout') : undefined}
         >
           <LogOut className="h-5 w-5" />
-          <span>{t('logout')}</span>
+          {!isCollapsed && <span>{t('logout')}</span>}
         </button>
       </div>
     </div>

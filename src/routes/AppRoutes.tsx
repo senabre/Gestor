@@ -9,7 +9,6 @@ import Invoices from '../components/Invoices';
 import Fees from '../components/Fees';
 import Staff from '../components/Staff';
 import PlayerSalaries from '../components/PlayerSalaries';
-import Settings from '../components/Settings';
 
 export default function AppRoutes() {
   return (
@@ -25,7 +24,6 @@ export default function AppRoutes() {
           <Route path="fees" element={<Fees />} />
           <Route path="staff" element={<Staff />} />
           <Route path="player-salaries" element={<PlayerSalaries />} />
-          <Route path="settings" element={<Settings />} />
         </Route>
       </Route>
     </Routes>
