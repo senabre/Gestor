@@ -83,7 +83,7 @@ export default function Invoices() {
   }
 
   return (
-    <div>
+    <div className="w-full">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Facturas</h1>
         <button
@@ -91,78 +91,53 @@ export default function Invoices() {
           className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2"
         >
           <Plus className="h-5 w-5" />
-          <span>Nueva Factura</span>
+          <span className="hidden sm:inline">Nueva Factura</span>
         </button>
       </div>
 
-      <div className="bg-white rounded-lg shadow-md overflow-hidden">
-        <table className="min-w-full">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Número
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Fecha
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Cliente
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Base
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                IVA
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Total
-              </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Acciones
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+      <div className="bg-white rounded-lg shadow-md overflow-x-auto">
+        <div className="min-w-full">
+          <div className="bg-gray-50 border-b">
+            <div className="grid grid-cols-7 md:grid-cols-8 gap-2 px-4 py-3">
+              <div className="col-span-2 text-xs font-medium text-gray-500 uppercase">Número</div>
+              <div className="col-span-2 text-xs font-medium text-gray-500 uppercase">Cliente</div>
+              <div className="hidden md:block text-xs font-medium text-gray-500 uppercase">Base</div>
+              <div className="text-xs font-medium text-gray-500 uppercase">IVA</div>
+              <div className="text-xs font-medium text-gray-500 uppercase">Total</div>
+              <div className="text-right text-xs font-medium text-gray-500 uppercase">Acciones</div>
+            </div>
+          </div>
+          <div className="divide-y divide-gray-200">
             {invoices.map((invoice) => (
-              <tr key={invoice.id}>
-                <td className="px-6 py-4">{invoice.number}</td>
-                <td className="px-6 py-4">
-                  {new Date(invoice.date).toLocaleDateString()}
-                </td>
-                <td className="px-6 py-4">{invoice.client_name}</td>
-                <td className="px-6 py-4">
-                  {(invoice.subtotal / 100).toFixed(2)}€
-                </td>
-                <td className="px-6 py-4">
-                  {(invoice.tax_amount / 100).toFixed(2)}€
-                </td>
-                <td className="px-6 py-4">
-                  {(invoice.total / 100).toFixed(2)}€
-                </td>
-                <td className="px-6 py-4 text-right">
+              <div key={invoice.id} className="grid grid-cols-7 md:grid-cols-8 gap-2 px-4 py-3 hover:bg-gray-50">
+                <div className="col-span-2 truncate">{invoice.number}</div>
+                <div className="col-span-2 truncate">{invoice.client_name}</div>
+                <div className="hidden md:block">{(invoice.subtotal / 100).toFixed(2)}€</div>
+                <div>{(invoice.tax_amount / 100).toFixed(2)}€</div>
+                <div>{(invoice.total / 100).toFixed(2)}€</div>
+                <div className="text-right">
                   <button
                     onClick={() => generateInvoicePDF(invoice)}
                     className="text-blue-600 hover:text-blue-800"
+                    title="Descargar PDF"
                   >
                     <FileText className="h-5 w-5" />
                   </button>
-                </td>
-              </tr>
+                </div>
+              </div>
             ))}
-          </tbody>
-        </table>
+          </div>
+        </div>
       </div>
 
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
             <h2 className="text-xl font-bold mb-4">Nueva Factura</h2>
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Cliente
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700">Cliente</label>
                   <input
                     type="text"
                     value={formData.client_name}
@@ -172,9 +147,7 @@ export default function Invoices() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    NIF/CIF
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700">NIF/CIF</label>
                   <input
                     type="text"
                     value={formData.client_nif}
@@ -185,9 +158,7 @@ export default function Invoices() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700">
-                  Dirección
-                </label>
+                <label className="block text-sm font-medium text-gray-700">Dirección</label>
                 <textarea
                   value={formData.client_address}
                   onChange={(e) => setFormData({ ...formData, client_address: e.target.value })}
@@ -200,74 +171,76 @@ export default function Invoices() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Líneas de Factura
                 </label>
-                {formData.items.map((item, index) => (
-                  <div key={index} className="grid grid-cols-12 gap-2 mb-2">
-                    <div className="col-span-6">
-                      <input
-                        type="text"
-                        value={item.description}
-                        onChange={(e) => {
-                          const newItems = [...formData.items];
-                          newItems[index].description = e.target.value;
-                          setFormData({ ...formData, items: newItems });
-                        }}
-                        placeholder="Descripción"
-                        className="w-full border rounded-lg px-3 py-2"
-                        required
-                      />
+                <div className="space-y-2">
+                  {formData.items.map((item, index) => (
+                    <div key={index} className="grid grid-cols-1 sm:grid-cols-12 gap-2">
+                      <div className="sm:col-span-6">
+                        <input
+                          type="text"
+                          value={item.description}
+                          onChange={(e) => {
+                            const newItems = [...formData.items];
+                            newItems[index].description = e.target.value;
+                            setFormData({ ...formData, items: newItems });
+                          }}
+                          placeholder="Descripción"
+                          className="w-full border rounded-lg px-3 py-2"
+                          required
+                        />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <input
+                          type="number"
+                          value={item.quantity}
+                          onChange={(e) => {
+                            const newItems = [...formData.items];
+                            newItems[index].quantity = Number(e.target.value);
+                            setFormData({ ...formData, items: newItems });
+                          }}
+                          placeholder="Cantidad"
+                          className="w-full border rounded-lg px-3 py-2"
+                          min="1"
+                          required
+                        />
+                      </div>
+                      <div className="sm:col-span-3">
+                        <input
+                          type="number"
+                          value={item.price}
+                          onChange={(e) => {
+                            const newItems = [...formData.items];
+                            newItems[index].price = Number(e.target.value);
+                            setFormData({ ...formData, items: newItems });
+                          }}
+                          placeholder="Precio"
+                          className="w-full border rounded-lg px-3 py-2"
+                          min="0"
+                          step="0.01"
+                          required
+                        />
+                      </div>
+                      <div className="sm:col-span-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newItems = formData.items.filter((_, i) => i !== index);
+                            setFormData({ ...formData, items: newItems });
+                          }}
+                          className="w-full text-red-600 hover:text-red-800 px-3 py-2"
+                        >
+                          ×
+                        </button>
+                      </div>
                     </div>
-                    <div className="col-span-2">
-                      <input
-                        type="number"
-                        value={item.quantity}
-                        onChange={(e) => {
-                          const newItems = [...formData.items];
-                          newItems[index].quantity = Number(e.target.value);
-                          setFormData({ ...formData, items: newItems });
-                        }}
-                        placeholder="Cantidad"
-                        className="w-full border rounded-lg px-3 py-2"
-                        min="1"
-                        required
-                      />
-                    </div>
-                    <div className="col-span-3">
-                      <input
-                        type="number"
-                        value={item.price}
-                        onChange={(e) => {
-                          const newItems = [...formData.items];
-                          newItems[index].price = Number(e.target.value);
-                          setFormData({ ...formData, items: newItems });
-                        }}
-                        placeholder="Precio"
-                        className="w-full border rounded-lg px-3 py-2"
-                        min="0"
-                        step="0.01"
-                        required
-                      />
-                    </div>
-                    <div className="col-span-1">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const newItems = formData.items.filter((_, i) => i !== index);
-                          setFormData({ ...formData, items: newItems });
-                        }}
-                        className="text-red-600 hover:text-red-800 px-3 py-2"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
                 <button
                   type="button"
                   onClick={() => setFormData({
                     ...formData,
                     items: [...formData.items, { description: '', quantity: 1, price: 0 }]
                   })}
-                  className="text-blue-600 hover:text-blue-800 text-sm"
+                  className="mt-2 text-blue-600 hover:text-blue-800 text-sm"
                 >
                   + Añadir línea
                 </button>
@@ -275,9 +248,7 @@ export default function Invoices() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    IVA (%)
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700">IVA (%)</label>
                   <input
                     type="number"
                     value={formData.tax_rate}
@@ -289,9 +260,7 @@ export default function Invoices() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Notas
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700">Notas</label>
                   <textarea
                     value={formData.notes}
                     onChange={(e) => setFormData({ ...formData, notes: e.target.value })}

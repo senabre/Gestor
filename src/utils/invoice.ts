@@ -69,7 +69,27 @@ doc.addImage(logoBase64, "PNG", 10, 10, 30, 30);
 
   // Información de la factura
   yy += 10
-  doc.text(`Número: ${invoice.number}`, 10, yy);
+  // Configuración inicial
+const margen = 10; // Margen entre el texto y los bordes de la caja
+const inicioXNumero = 10; // Posición X inicial para el número
+const altoCaja = 8; // Altura de las cajas
+const yyEncabezado = yy; // Posición Y para el encabezado
+
+
+// Etiquetas del encabezado
+
+doc.text("Número", 10, yyEncabezado); // Etiqueta para "Número"
+doc.text("Fecha", 10 + doc.getTextWidth("Número") + 20, yyEncabezado); // Etiqueta "Fecha
+yy +=5
+  // Calcula el ancho del texto "Número"
+const textoNumero = `${invoice.number}`;
+const anchoTextoNumero = doc.getTextWidth(textoNumero) + margen * 2;
+
+// Dibuja la caja para "Número"
+doc.rect(inicioXNumero, yy - 4, anchoTextoNumero, 8); // Caja para el número
+doc.text(textoNumero, inicioXNumero + margen, yy); // Texto del número
+
+// Calcula el ancho del texto "Fecha"
   const fechaBD = invoice.date;
   const fecha = new Date(fechaBD);
   const fechaFormateada = fecha.toLocaleDateString("es-ES", {
@@ -77,7 +97,16 @@ doc.addImage(logoBase64, "PNG", 10, 10, 30, 30);
   month: "2-digit",
   year: "numeric"
 });
-  doc.text(`Fecha: ${fechaFormateada}`, 60, yy);
+const textoFecha = fechaFormateada;
+const anchoTextoFecha = doc.getTextWidth(textoFecha) + margen * 2;
+
+const inicioXFecha = inicioXNumero + anchoTextoNumero;
+  
+// Dibuja la caja para "Fecha"
+doc.rect(inicioXFecha, yy - 4, anchoTextoFecha, 8); // Caja para la fecha
+doc.text(textoFecha, inicioXFecha + margen, yy); // Texto de la fecha
+doc.rect(10, yy - 9,anchoTextoFecha + anchoTextoNumero, 5);  
+  
 
   // Tabla de conceptos
   doc.setFont("helvetica", "bold");
