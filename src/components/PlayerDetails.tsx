@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Printer, Pencil, Trash2 } from 'lucide-react';
+import { useParams, Link } from 'react-router-dom';
+import { ArrowLeft, Plus, FileText, Pencil } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Player, Payment, Team } from '../types';
 import { generateReceipt } from '../utils/receipt';
@@ -11,38 +11,53 @@ import { useTranslation } from '../hooks/useTranslation';
 export default function PlayerDetails() {
   const { t } = useTranslation();
   const { playerId } = useParams<{ playerId: string }>();
-  const navigate = useNavigate();
   const [player, setPlayer] = useState<Player | null>(null);
   const [team, setTeam] = useState<Team | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [paymentData, setPaymentData] = useState({
     amount: 0,
-    notes: ''
+    notes: '',
+    payment_method: 'cash' as 'cash' | 'transfer',
+    document: null as File | null
   });
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     if (playerId) {
-      fetchPlayer();
+      fetchPlayerAndTeam();
       fetchPayments();
     }
   }, [playerId]);
 
-  async function fetchPlayer() {
+  async function fetchPlayerAndTeam() {
     try {
+      setLoading(true);
+      setError(null);
+
+      // Fetch player with team data in a single query
       const { data, error } = await supabase
         .from('players')
-        .select('*, teams(*)')
+        .select(`
+          *,
+          teams:team_id (*)
+        `)
         .eq('id', playerId)
         .single();
-      
+
       if (error) throw error;
-      
+      if (!data) throw new Error('Jugador no encontrado');
+
       setPlayer(data);
       setTeam(data.teams);
-    } catch (error) {
-      console.error('Error fetching player:', error);
+    } catch (err: any) {
+      console.error('Error fetching player:', err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -53,9 +68,8 @@ export default function PlayerDetails() {
         .select('*')
         .eq('player_id', playerId)
         .order('payment_date', { ascending: false });
-      
+
       if (error) throw error;
-      
       setPayments(data || []);
     } catch (error) {
       console.error('Error fetching payments:', error);
@@ -66,6 +80,20 @@ export default function PlayerDetails() {
     e.preventDefault();
     
     try {
+      setUploading(true);
+      let document_url = null;
+
+      // Upload document if payment is by transfer and there's a file
+      if (paymentData.payment_method === 'transfer' && paymentData.document) {
+        const fileName = `${Date.now()}-${paymentData.document.name}`;
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('payment-documents')
+          .upload(fileName, paymentData.document);
+
+        if (uploadError) throw uploadError;
+        document_url = uploadData.path;
+      }
+
       const receiptNumber = `REC-${Date.now()}`;
       
       const { error: paymentError } = await supabase
@@ -74,7 +102,9 @@ export default function PlayerDetails() {
           player_id: playerId,
           amount: Math.round(paymentData.amount * 100),
           receipt_number: receiptNumber,
-          notes: paymentData.notes
+          notes: paymentData.notes,
+          payment_method: paymentData.payment_method,
+          document_url
         }]);
       
       if (paymentError) throw paymentError;
@@ -92,47 +122,14 @@ export default function PlayerDetails() {
       }
       
       setShowPaymentModal(false);
-      setPaymentData({ amount: 0, notes: '' });
-      fetchPlayer();
+      setPaymentData({ amount: 0, notes: '', payment_method: 'cash', document: null });
+      fetchPlayerAndTeam();
       fetchPayments();
     } catch (error) {
       console.error('Error creating payment:', error);
-    }
-  }
-
-  async function handlePaymentDelete(paymentId: string) {
-    try {
-      // Get payment amount before deleting
-      const payment = payments.find(p => p.id === paymentId);
-      if (!payment || !player) return;
-
-      // Delete payment
-      const { error: deleteError } = await supabase
-        .from('payments')
-        .delete()
-        .eq('id', paymentId);
-      
-      if (deleteError) throw deleteError;
-
-      // Update player's paid amount
-      const { error: updateError } = await supabase
-        .from('players')
-        .update({
-          paid_amount: player.paid_amount - payment.amount
-        })
-        .eq('id', playerId);
-      
-      if (updateError) throw updateError;
-
-      // Update local state
-      setPayments(payments.filter(p => p.id !== paymentId));
-      setPlayer(prev => prev ? {
-        ...prev,
-        paid_amount: prev.paid_amount - payment.amount
-      } : null);
-    } catch (error) {
-      console.error('Error deleting payment:', error);
-      alert(t('errorDeletingPayment'));
+      alert('Error al crear el pago. Por favor, inténtalo de nuevo.');
+    } finally {
+      setUploading(false);
     }
   }
 
@@ -146,7 +143,30 @@ export default function PlayerDetails() {
     }
   }
 
-  if (!player) return null;
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-red-600 mb-4">{error}</p>
+        <Link
+          to="/"
+          className="text-blue-600 hover:text-blue-800 flex items-center justify-center space-x-2"
+        >
+          <ArrowLeft className="h-5 w-5" />
+          <span>Volver a equipos</span>
+        </Link>
+      </div>
+    );
+  }
+
+  if (!player || !team) return null;
 
   const pendingAmount = (player.total_fee - player.paid_amount) / 100;
 
@@ -216,7 +236,10 @@ export default function PlayerDetails() {
       <div className="bg-white rounded-lg shadow-md overflow-hidden dark:bg-gray-800">
         <PaymentList
           payments={payments}
-          onDelete={handlePaymentDelete}
+          onDelete={(paymentId) => {
+            setPayments(payments.filter(p => p.id !== paymentId));
+            fetchPlayerAndTeam(); // Refresh player data to update paid amount
+          }}
           onPrintReceipt={handlePrintReceipt}
         />
       </div>
@@ -240,8 +263,58 @@ export default function PlayerDetails() {
                   max={pendingAmount}
                   step="0.01"
                   required
+                  disabled={uploading}
                 />
               </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Método de pago
+                </label>
+                <select
+                  value={paymentData.payment_method}
+                  onChange={(e) => setPaymentData({ 
+                    ...paymentData, 
+                    payment_method: e.target.value as 'cash' | 'transfer',
+                    document: e.target.value === 'cash' ? null : paymentData.document
+                  })}
+                  className="mt-1 w-full border rounded-lg px-3 py-2 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                  disabled={uploading}
+                >
+                  <option value="cash">Efectivo</option>
+                  <option value="transfer">Transferencia</option>
+                </select>
+              </div>
+
+              {paymentData.payment_method === 'transfer' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Justificante de transferencia (PDF)
+                  </label>
+                  <div className="mt-1 flex items-center space-x-2">
+                    <input
+                      type="file"
+                      accept=".pdf"
+                      onChange={(e) => setPaymentData({ 
+                        ...paymentData, 
+                        document: e.target.files?.[0] || null 
+                      })}
+                      className="hidden"
+                      id="document-upload"
+                      required={paymentData.payment_method === 'transfer'}
+                      disabled={uploading}
+                    />
+                    <label
+                      htmlFor="document-upload"
+                      className="flex items-center space-x-2 px-4 py-2 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-700"
+                    >
+                      <FileText className="h-5 w-5" />
+                      <span>{paymentData.document ? paymentData.document.name : 'Subir documento'}</span>
+                    </label>
+                  </div>
+                </div>
+              )}
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                   {t('notes')}
@@ -251,24 +324,35 @@ export default function PlayerDetails() {
                   onChange={(e) => setPaymentData({ ...paymentData, notes: e.target.value })}
                   className="mt-1 w-full border rounded-lg px-3 py-2 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                   rows={3}
+                  disabled={uploading}
                 />
               </div>
+
               <div className="flex justify-end space-x-2">
                 <button
                   type="button"
                   onClick={() => {
                     setShowPaymentModal(false);
-                    setPaymentData({ amount: 0, notes: '' });
+                    setPaymentData({ amount: 0, notes: '', payment_method: 'cash', document: null });
                   }}
                   className="px-4 py-2 text-gray-600 dark:text-gray-400"
+                  disabled={uploading}
                 >
                   {t('cancel')}
                 </button>
                 <button
                   type="submit"
-                  className="bg-blue-600 text-white px-4 py-2 rounded-lg"
+                  className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2"
+                  disabled={uploading}
                 >
-                  {t('registerPayment')}
+                  {uploading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                      <span>Procesando...</span>
+                    </>
+                  ) : (
+                    <span>{t('registerPayment')}</span>
+                  )}
                 </button>
               </div>
             </form>
@@ -277,7 +361,7 @@ export default function PlayerDetails() {
       )}
 
       {/* Edit Modal */}
-      {showEditModal && player && (
+      {showEditModal && (
         <PlayerForm
           player={player}
           onClose={() => setShowEditModal(false)}
@@ -291,9 +375,10 @@ export default function PlayerDetails() {
               if (error) throw error;
               
               setShowEditModal(false);
-              fetchPlayer();
+              fetchPlayerAndTeam();
             } catch (error) {
               console.error('Error updating player:', error);
+              alert('Error al actualizar el jugador');
             }
           }}
         />

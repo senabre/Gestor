@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, FileText } from 'lucide-react';
+import { Plus, FileText, Download } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { Team, Player, PlayerSalaryPayment } from '../types';
 import SalaryTeamForm from './SalaryTeamForm';
 import SalaryPlayerForm from './SalaryPlayerForm';
 import PlayerSalaryPaymentForm from './PlayerSalaryPaymentForm';
-import SalaryStats from './SalaryStats';
 import { generatePlayerSalaryPaymentPDF } from '../utils/playerSalaryPayment';
 
 export default function PlayerSalaries() {
@@ -18,133 +17,108 @@ export default function PlayerSalaries() {
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchSalaryTeams();
-    subscribeToChanges();
   }, []);
 
-  function subscribeToChanges() {
-    const teamChanges = supabase
-      .channel('salary-teams-changes')
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
-        table: 'salary_teams' 
-      }, () => {
-        fetchSalaryTeams();
-      })
-      .subscribe();
-
-    const playerChanges = supabase
-      .channel('salary-players-changes')
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
-        table: 'salary_players' 
-      }, () => {
-        fetchSalaryTeams();
-      })
-      .subscribe();
-
-    const paymentChanges = supabase
-      .channel('salary-payments-changes')
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
-        table: 'player_salary_payments' 
-      }, () => {
-        teams.forEach(team => fetchTeamPlayers(team.id));
-      })
-      .subscribe();
-
-    return () => {
-      teamChanges.unsubscribe();
-      playerChanges.unsubscribe();
-      paymentChanges.unsubscribe();
-    };
-  }
-
   async function fetchSalaryTeams() {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('salary_teams')
-        .select('*')
-        .order('name');
-      
-      if (error) throw error;
-      
-      setTeams(data);
-      data.forEach(team => fetchTeamPlayers(team.id));
-    } catch (error) {
+    const { data, error } = await supabase
+      .from('salary_teams')
+      .select('*')
+      .order('name');
+    
+    if (error) {
       console.error('Error fetching salary teams:', error);
-    } finally {
-      setLoading(false);
+      return;
     }
+    
+    setTeams(data);
+    data.forEach(team => fetchTeamPlayers(team.id));
   }
 
   async function fetchTeamPlayers(teamId: string) {
-    try {
-      const { data, error } = await supabase
-        .from('salary_players')
-        .select('*')
-        .eq('team_id', teamId)
-        .order('name');
-      
-      if (error) throw error;
-      
-      setPlayers(prev => ({
-        ...prev,
-        [teamId]: data
-      }));
-
-      data.forEach(player => {
-        fetchPlayerSalary(player.id);
-        fetchPlayerPayments(player.id);
-      });
-    } catch (error) {
+    const { data, error } = await supabase
+      .from('salary_players')
+      .select('*')
+      .eq('team_id', teamId)
+      .order('name');
+    
+    if (error) {
       console.error('Error fetching team players:', error);
+      return;
     }
+    
+    setPlayers(prev => ({
+      ...prev,
+      [teamId]: data
+    }));
+
+    data.forEach(player => {
+      fetchPlayerSalary(player.id);
+      fetchPlayerPayments(player.id);
+    });
   }
 
   async function fetchPlayerSalary(playerId: string) {
-    try {
-      const { data, error } = await supabase
-        .from('player_salaries')
-        .select('*')
-        .eq('player_id', playerId)
-        .order('created_at', { ascending: false })
-        .limit(1);
-      
-      if (error) throw error;
-      
-      setSalaries(prev => ({
-        ...prev,
-        [playerId]: data?.[0]?.salary || 0
-      }));
-    } catch (error) {
+    const { data, error } = await supabase
+      .from('player_salaries')
+      .select('*')
+      .eq('player_id', playerId)
+      .order('created_at', { ascending: false })
+      .limit(1);
+    
+    if (error) {
       console.error('Error fetching salary:', error);
+      return;
     }
+    
+    setSalaries(prev => ({
+      ...prev,
+      [playerId]: data?.[0]?.salary || 0
+    }));
   }
 
   async function fetchPlayerPayments(playerId: string) {
-    try {
-      const { data, error } = await supabase
-        .from('player_salary_payments')
-        .select('*')
-        .eq('player_id', playerId)
-        .order('payment_date', { ascending: false });
-      
-      if (error) throw error;
-      
-      setPayments(prev => ({
-        ...prev,
-        [playerId]: data
-      }));
-    } catch (error) {
+    const { data, error } = await supabase
+      .from('player_salary_payments')
+      .select('*')
+      .eq('player_id', playerId)
+      .order('payment_date', { ascending: false });
+    
+    if (error) {
       console.error('Error fetching payments:', error);
+      return;
+    }
+    
+    setPayments(prev => ({
+      ...prev,
+      [playerId]: data
+    }));
+  }
+
+  async function handleDownloadDocument(payment: PlayerSalaryPayment) {
+    if (!payment.document_url) return;
+
+    try {
+      const { data, error } = await supabase.storage
+        .from('payment-documents')
+        .download(payment.document_url);
+
+      if (error) throw error;
+
+      // Create download link
+      const url = URL.createObjectURL(data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `justificante-${payment.receipt_number}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error downloading document:', error);
+      alert('Error al descargar el documento');
     }
   }
 
@@ -157,101 +131,101 @@ export default function PlayerSalaries() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-8">
-      {/* Estadísticas */}
-      <SalaryStats />
+    <div>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">Salarios de Jugadores</h1>
+        <button
+          onClick={() => setShowTeamModal(true)}
+          className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2"
+        >
+          <Plus className="h-5 w-5" />
+          <span>Añadir Equipo</span>
+        </button>
+      </div>
 
-      {/* Lista de equipos */}
-      <div>
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold">Equipos y Jugadores</h2>
-          <button
-            onClick={() => setShowTeamModal(true)}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2"
-          >
-            <Plus className="h-5 w-5" />
-            <span>Añadir Equipo</span>
-          </button>
-        </div>
+      <div className="space-y-6">
+        {teams.map(team => (
+          <div key={team.id} className="bg-white rounded-lg shadow-md p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold">{team.name}</h2>
+              <button
+                onClick={() => {
+                  setSelectedTeam(team);
+                  setShowPlayerModal(true);
+                }}
+                className="text-blue-600 hover:text-blue-800 flex items-center space-x-1"
+              >
+                <Plus className="h-4 w-4" />
+                <span>Añadir Jugador</span>
+              </button>
+            </div>
 
-        <div className="space-y-6">
-          {teams.map(team => (
-            <div key={team.id} className="bg-white rounded-lg shadow-md p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-semibold">{team.name}</h2>
-                <button
-                  onClick={() => {
-                    setSelectedTeam(team);
-                    setShowPlayerModal(true);
-                  }}
-                  className="text-blue-600 hover:text-blue-800 flex items-center space-x-1"
-                >
-                  <Plus className="h-4 w-4" />
-                  <span>Añadir Jugador</span>
-                </button>
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="min-w-full">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="text-left py-2">Jugador</th>
-                      <th className="text-left py-2">Salario</th>
-                      <th className="text-right py-2">Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {players[team.id]?.map(player => (
-                      <tr key={player.id} className="border-b">
-                        <td className="py-2">{player.name}</td>
-                        <td className="py-2">{(salaries[player.id] / 100).toFixed(2)}€</td>
-                        <td className="py-2 text-right">
-                          <button
-                            onClick={() => {
-                              setSelectedPlayer(player);
-                              setShowPaymentModal(true);
-                            }}
-                            className="text-blue-600 hover:text-blue-800 ml-2"
-                          >
-                            <Plus className="h-4 w-4" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Historial de pagos */}
-              {players[team.id]?.map(player => (
-                payments[player.id]?.length > 0 && (
-                  <div key={`payments-${player.id}`} className="mt-4">
-                    <h3 className="text-sm font-semibold mb-2">
-                      Pagos de {player.name}
-                    </h3>
-                    <div className="space-y-2">
-                      {payments[player.id].map(payment => (
-                        <div
-                          key={payment.id}
-                          className="flex justify-between items-center text-sm"
+            <div className="overflow-x-auto">
+              <table className="min-w-full">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-2">Jugador</th>
+                    <th className="text-left py-2">Salario</th>
+                    <th className="text-right py-2">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {players[team.id]?.map(player => (
+                    <tr key={player.id} className="border-b">
+                      <td className="py-2">{player.name}</td>
+                      <td className="py-2">{(salaries[player.id] / 100).toFixed(2)}€</td>
+                      <td className="py-2 text-right">
+                        <button
+                          onClick={() => {
+                            setSelectedPlayer(player);
+                            setShowPaymentModal(true);
+                          }}
+                          className="text-blue-600 hover:text-blue-800 ml-2"
                         >
-                          <div>
-                            <span className="text-gray-600">
-                              {new Date(payment.payment_date).toLocaleDateString()}
-                            </span>
-                            <span className="ml-2 font-medium">
-                              {(payment.amount / 100).toFixed(2)}€
-                            </span>
-                          </div>
+                          <Plus className="h-4 w-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Historial de pagos */}
+            {players[team.id]?.map(player => (
+              payments[player.id]?.length > 0 && (
+                <div key={`payments-${player.id}`} className="mt-4">
+                  <h3 className="text-sm font-semibold mb-2">
+                    Pagos de {player.name}
+                  </h3>
+                  <div className="space-y-2">
+                    {payments[player.id].map(payment => (
+                      <div
+                        key={payment.id}
+                        className="flex justify-between items-center text-sm"
+                      >
+                        <div>
+                          <span className="text-gray-600">
+                            {new Date(payment.payment_date).toLocaleDateString()}
+                          </span>
+                          <span className="ml-2 font-medium">
+                            {(payment.amount / 100).toFixed(2)}€
+                          </span>
+                          <span className="ml-2 text-gray-500">
+                            ({payment.payment_method === 'cash' ? 'Efectivo' : 'Transferencia'})
+                          </span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          {payment.document_url && (
+                            <button
+                              onClick={() => handleDownloadDocument(payment)}
+                              className="text-green-600 hover:text-green-800"
+                              title="Descargar justificante"
+                            >
+                              <Download className="h-4 w-4" />
+                            </button>
+                          )}
                           <button
                             onClick={() => handlePrintReceipt(payment, player, team)}
                             className="text-blue-600 hover:text-blue-800"
@@ -259,14 +233,14 @@ export default function PlayerSalaries() {
                             <FileText className="h-4 w-4" />
                           </button>
                         </div>
-                      ))}
-                    </div>
+                      </div>
+                    ))}
                   </div>
-                )
-              ))}
-            </div>
-          ))}
-        </div>
+                </div>
+              )
+            ))}
+          </div>
+        ))}
       </div>
 
       {/* Modales */}
