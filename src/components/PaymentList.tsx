@@ -13,17 +13,39 @@ interface PaymentListProps {
 export default function PaymentList({ payments, onDelete, onPrintReceipt }: PaymentListProps) {
   const { t } = useTranslation();
 
-  async function handleDelete(paymentId: string) {
+  async function handleDelete(payment: Payment) {
     if (!confirm(t('confirmDeletePayment'))) return;
 
     try {
-      const { error } = await supabase
+      // Start a transaction
+      const { error: deleteError } = await supabase
         .from('payments')
         .delete()
-        .eq('id', paymentId);
+        .eq('id', payment.id);
 
-      if (error) throw error;
-      onDelete(paymentId);
+      if (deleteError) throw deleteError;
+
+      // Update player's paid_amount
+      const { error: updateError } = await supabase.rpc('update_player_paid_amount', {
+        p_player_id: payment.player_id,
+        p_amount: -payment.amount // Subtract the payment amount
+      });
+
+      if (updateError) throw updateError;
+
+      // Delete document if exists
+      if (payment.document_url) {
+        const { error: storageError } = await supabase.storage
+          .from('payment-documents')
+          .remove([payment.document_url]);
+
+        if (storageError) {
+          console.error('Error deleting document:', storageError);
+          // Don't throw here as the payment was already deleted
+        }
+      }
+
+      onDelete(payment.id);
     } catch (error) {
       console.error('Error deleting payment:', error);
       alert(t('errorDeletingPayment'));
@@ -108,7 +130,7 @@ export default function PaymentList({ payments, onDelete, onPrintReceipt }: Paym
                   </button>
                 )}
                 <button
-                  onClick={() => handleDelete(payment.id)}
+                  onClick={() => handleDelete(payment)}
                   className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
                   title={t('delete')}
                 >

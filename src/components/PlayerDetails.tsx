@@ -88,19 +88,24 @@ export default function PlayerDetails() {
         const fileName = `${Date.now()}-${paymentData.document.name}`;
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from('payment-documents')
-          .upload(fileName, paymentData.document);
+          .upload(fileName, paymentData.document, {
+            cacheControl: '3600',
+            upsert: false
+          });
 
         if (uploadError) throw uploadError;
         document_url = uploadData.path;
       }
 
       const receiptNumber = `REC-${Date.now()}`;
+      const amount = Math.round(paymentData.amount * 100);
       
+      // Insert payment
       const { error: paymentError } = await supabase
         .from('payments')
         .insert([{
           player_id: playerId,
-          amount: Math.round(paymentData.amount * 100),
+          amount,
           receipt_number: receiptNumber,
           notes: paymentData.notes,
           payment_method: paymentData.payment_method,
@@ -110,16 +115,12 @@ export default function PlayerDetails() {
       if (paymentError) throw paymentError;
 
       // Update player's paid amount
-      if (player) {
-        const { error: playerError } = await supabase
-          .from('players')
-          .update({
-            paid_amount: player.paid_amount + Math.round(paymentData.amount * 100)
-          })
-          .eq('id', playerId);
-        
-        if (playerError) throw playerError;
-      }
+      const { error: updateError } = await supabase.rpc('update_player_paid_amount', {
+        p_player_id: playerId,
+        p_amount: amount
+      });
+      
+      if (updateError) throw updateError;
       
       setShowPaymentModal(false);
       setPaymentData({ amount: 0, notes: '', payment_method: 'cash', document: null });
@@ -238,7 +239,7 @@ export default function PlayerDetails() {
           payments={payments}
           onDelete={(paymentId) => {
             setPayments(payments.filter(p => p.id !== paymentId));
-            fetchPlayerAndTeam(); // Refresh player data to update paid amount
+            fetchPlayerAndTeam(); // Refresh player data to update totals
           }}
           onPrintReceipt={handlePrintReceipt}
         />
